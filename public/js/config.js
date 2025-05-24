@@ -1,4 +1,4 @@
-// config.js
+// CONFIG.JS
 
 // Primero verificamos que Phaser esté cargado
 if (typeof Phaser === 'undefined') {
