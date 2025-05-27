@@ -2,13 +2,14 @@ let submarine, torpedos, bullets, enemies;
 let cursors, fireTorpedoKey, fireBulletKey, restartButton;
 let lives = 5;
 let score = 0;
-let highScore = 0;
-let previousHighScore = 0;
+let highScore = localStorage.getItem('highScore') ? parseInt(localStorage.getItem('highScore')) : 0;
+let hasBeatenRecord = false;
 let scoreText, livesText, controlsText, highScoreText;
 let lastTorpedoFired = 0;
 let lastBulletFired = 0;
 let shootSound;
 let lifeIcons = [];
+let recordMessage;
 
 function preload() {
     this.load.image('background', 'images/background.png');
@@ -40,7 +41,7 @@ function create() {
 
     cursors = this.input.keyboard.createCursorKeys();
     fireTorpedoKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-    fireBulletKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+    fireBulletKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.B);
 
     shootSound = this.sound.add('shoot');
 
@@ -53,7 +54,7 @@ function create() {
         lifeIcons.push(icon);
     }
 
-    controlsText = this.add.text(this.sys.game.config.width - 220, 16, 'Controles:\nFlechas: Movimiento\nEspacio: Torpedo\nShift: Bala', {
+    controlsText = this.add.text(this.sys.game.config.width - 220, 16, 'Controles:\nFlechas: Movimiento\nEspacio: Torpedo\nB: Bala', {
         fontSize: '20px', fill: '#fff', backgroundColor: '#00000080'
     });
 
@@ -63,6 +64,12 @@ function create() {
 
     this.spawnEnemies = spawnEnemies;
     this.spawnEnemies.call(this);
+
+    recordMessage = this.add.text(this.sys.game.config.width / 2, 150, '¡Récord superado!', {
+        fontSize: '32px',
+        fill: '#00ff00',
+        backgroundColor: '#00000080'
+    }).setOrigin(0.5).setVisible(false);
 }
 
 function update() {
@@ -107,7 +114,7 @@ function shootTorpedo(scene) {
     shootSound.play();
 }
 
-function shootBullet(scene) { 
+function shootBullet(scene) {
     const bullet = bullets.create(submarine.x, submarine.y - 20, 'bullet');
     bullet.setScale(1.8);
     bullet.setVelocityY(-400);
@@ -153,7 +160,6 @@ function hitEnemy(projectile, enemy) {
     score += points;
     scoreText.setText(`Puntos: ${score}`);
 
-    // Mostrar el texto +10 en color verde
     const plusText = scene.add.text(enemy.x, enemy.y, `+${points}`, {
         fontSize: '24px',
         fill: '#00ff00',
@@ -165,46 +171,52 @@ function hitEnemy(projectile, enemy) {
         plusText.destroy();
     });
 
-    if (score > highScore && previousHighScore !== highScore) {
+    if (!hasBeatenRecord && score > highScore) {
         highScore = score;
+        localStorage.setItem('highScore', highScore);
         highScoreText.setText(`Récord: ${highScore}`);
 
-        const recordText = scene.add.text(scene.sys.game.config.width / 2, 150, '¡Nuevo récord!', {
-            fontSize: '32px',
-            fill: '#00ff00'
-        }).setOrigin(0.5);
+        recordMessage.setVisible(true);
+        hasBeatenRecord = true;
 
-        scene.tweens.add({
-            targets: recordText,
-            alpha: 0,
-            duration: 2000,
-            onComplete: () => recordText.destroy()
+        scene.time.delayedCall(2000, () => {
+            recordMessage.setVisible(false);
         });
-
-        previousHighScore = highScore;
     }
 }
 
 function hitSubmarine(submarine, enemy) {
     enemy.destroy();
+    
     lives--;
-    if (lifeIcons[lives]) lifeIcons[lives].setVisible(false);
+    if (lifeIcons[lives]) lifeIcons[lives].setVisible(false); // CORRECTO: después de restar
+    
     livesText.setText('Vidas:');
-
     submarine.setTint(0xff0000);
+    
     this.time.delayedCall(500, () => submarine.clearTint());
 
-    if (lives <= 0) gameOver(this);
+    if (lives <= 0) {
+        gameOver(this);
+    }
 }
+
 
 function gameOver(scene) {
     if (!scene.physics.world.isPaused) {
         scene.physics.pause();
         submarine.setTint(0xff0000);
+
+        if (score > highScore) {
+            highScore = score;
+            localStorage.setItem('highScore', highScore);
+        }
+
         scene.add.text(scene.sys.game.config.width / 2, scene.sys.game.config.height / 2, 'GAME OVER', {
             fontSize: '48px',
             fill: '#ff0000'
         }).setOrigin(0.5);
+
         createRestartButton(scene);
     }
 }
@@ -216,9 +228,9 @@ function createRestartButton(scene) {
         backgroundColor: '#00000080',
         padding: { x: 20, y: 10 }
     }).setOrigin(0.5).setInteractive().on('pointerdown', () => {
-        previousHighScore = highScore;
         scene.scene.restart();
         lives = 5;
         score = 0;
+        hasBeatenRecord = false;
     });
 }
